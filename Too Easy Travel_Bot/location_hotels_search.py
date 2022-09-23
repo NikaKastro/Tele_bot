@@ -138,9 +138,9 @@ def make_hotel_answer(message: dict) -> Union[str, list]:
                     photos = photos_search(item.get("id"))
                     photos_dict = dict()
                     for photo in range(len(photos.get("hotelImages"))):
-                        photos_dict["Url " + str(photo)] = photos.get("hotelImages")[item].get("baseUrl")\
+                        photos_dict["Url " + str(photo)] = photos.get("hotelImages")[photo].get("baseUrl")\
                             .replace("{size}", "z")
-                        if item == int(count_photo) - 1:
+                        if photo == int(count_photo) - 1:
                             break
                     answer_dict["photo"] = photos_dict
                 answer_hotels.append(answer_dict)
@@ -158,9 +158,9 @@ def make_hotel_answer(message: dict) -> Union[str, list]:
 
 def get_count_day(message: dict) -> int:
     """
-    Функция для расчета количества дней пребыввания.
+    Функция для расчета количества дней пребывания.
     :param message: словарь с параметрами.
-    :return: количетсво дней пребывания.
+    :return: количество дней пребывания.
     """
     check_out = datetime.strptime(message.get("checkOut"), "%Y-%m-%d")
     check_in = datetime.strptime(message.get("checkIn"), "%Y-%m-%d")
