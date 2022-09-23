@@ -207,7 +207,7 @@ def get_check_in(message: Any) -> None:
     Проверяет количество отлей и запрашивает дату заезда.
     :rtype: object
     """
-    if message.text.isdigit() and int(message.text) <= 10:
+    if message.text.isdigit() and 0 < int(message.text) <= 10:
         user_params_search["pageSize"] = message.text
         easy_travel_bot.send_message(message.chat.id, "Введите дату <b>заезда</b> в формате YYYY-MM-DD.",
                                      parse_mode="html")
@@ -216,7 +216,7 @@ def get_check_in(message: Any) -> None:
     else:
         easy_travel_bot.send_message(message.chat.id, "Количество отелей должно быть целым числом и не более 10. "
                                                       "Введите число заново.", parse_mode="html")
-        easy_travel_bot.register_next_step_handler(message, get_count_hotel)
+        easy_travel_bot.register_next_step_handler(message, get_check_in)
         return
 
 
