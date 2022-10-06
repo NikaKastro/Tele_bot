@@ -1,12 +1,13 @@
 import requests
 import json
 import logging
+import nums_from_string
 from typing import Optional, Union
 from datetime import datetime
 
 logging.basicConfig(filename="bad_request.log", level=logging.INFO, encoding="utf-8")
 
-X_RAPIDAPI_KEY = "776660e21dmshdfbc19f95b0394fp164321jsn295e3ce8aa64"
+X_RAPIDAPI_KEY = "3ca15b43b1mshcac4be044f5df80p1d5eedjsn7e34201ad1dd"
 
 
 def location_search(user_city: dict) -> Optional[dict]:
@@ -54,7 +55,7 @@ def photos_search(id_hotel: dict) -> Optional[dict]:
     querystring = {"id": id_hotel}
 
     headers = {
-        "X-RapidAPI-Key": "776660e21dmshdfbc19f95b0394fp164321jsn295e3ce8aa64",
+        "X-RapidAPI-Key": X_RAPIDAPI_KEY,
         "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
     }
     return api_request(url, querystring, headers)
@@ -123,9 +124,13 @@ def make_hotel_answer(message: dict) -> Union[str, list]:
     else:
         answer_hotels = []
         count_photo = message.get("photo")
-        # distance = message.get("photo")
+        distance = message.get("photo")
         try:
             for item in hotels.get("data").get('body').get('searchResults').get('results'):
+                if distance is not None:
+                    hotel_distance = item.get("landmarks")[0].get("distance").split(" ")[0].replace(",", ".")
+                    if float(distance) < float(hotel_distance):
+                        continue
                 answer_dict = dict()
                 answer_dict["name"] = item.get("name")
                 answer_dict["starRating"] = item.get("starRating")

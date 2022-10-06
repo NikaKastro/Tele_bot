@@ -1,13 +1,16 @@
 import telebot
 import re
+import datetime
+from user import User
 from location_hotels_search import make_location_answer, make_hotel_answer
+from db import set_data, set_table, get_history
 from typing import Any
-
 from datetime import datetime
 from telebot import types
 
 easy_travel_bot = telebot.TeleBot("5486223307:AAF5Eybbh41RAJtunGck0UOWkmCWAh4zS1k")
-user_params_search = {}
+
+set_table()
 
 
 @easy_travel_bot.message_handler(commands=['start'])
@@ -46,18 +49,16 @@ def lowprice_highprice(message: Any) -> None:
     Добавляет параметры в словарь для поиска и отравляет пользователю сообщение для следующего шага диалога.
     :rtype: object
     """
+    User.get_user(message.chat.id)
     if message.text == "/lowprice":
-        user_params_search["sortOrder"] = "PRICE"
-        if "priceMin" in user_params_search:
-            del user_params_search["priceMin"]
-            del user_params_search["priceMax"]
+        User.get_user(message.chat.id).user_command = "/lowprice"
+        User.get_user(message.chat.id).sort_order = "PRICE"
     elif message.text == "/bestdeal":
-        user_params_search["sortOrder"] = "DISTANCE_FROM_LANDMARK"
+        User.get_user(message.chat.id).user_command = "/bestdeal"
+        User.get_user(message.chat.id).sort_order = "DISTANCE_FROM_LANDMARK"
     else:
-        user_params_search["sortOrder"] = "PRICE_HIGHEST_FIRST"
-        if "priceMin" in user_params_search:
-            del user_params_search["priceMin"]
-            del user_params_search["priceMax"]
+        User.get_user(message.chat.id).user_command = "/highprice"
+        User.get_user(message.chat.id).sort_order = "PRICE_HIGHEST_FIRST"
     easy_travel_bot.send_message(message.chat.id, "В каком городе искать отели?", parse_mode="html")
     easy_travel_bot.register_next_step_handler(message, get_city)
 
@@ -65,10 +66,16 @@ def lowprice_highprice(message: Any) -> None:
 @easy_travel_bot.message_handler(commands=['history'])
 def history(message: Any) -> None:
     easy_travel_bot.send_message(message.chat.id, "Посмотрим историю поиска?", parse_mode="html")
+    user = get_history(User.get_user_id(User.get_user(message.chat.id)))
+    for story in user:
+        send = "Дата поиска: "
+        for elem_story in story:
+            send += str(elem_story) + "\n"
+        easy_travel_bot.send_message(message.chat.id, send, parse_mode="html")
 
 
 @easy_travel_bot.message_handler(content_types=["text"])
-def get_text_messages(message: Any)-> None:
+def get_text_messages(message: Any) -> None:
     """
     Отправляет пользователю сообщение о необходимости ввести команду. Направляется в случае некорректного ввода.
     :rtype: object
@@ -91,16 +98,15 @@ def callback_worker(call: Any) -> None:
     elif call.data == "no":
         easy_travel_bot.send_message(call.message.chat.id, "Хорошо. Ищем без фотографий.&#128146",
                                      parse_mode="html")
-        if "photo" in user_params_search:
-            del user_params_search["photo"]
-        send_user_hotels(user_params_search, call.message)
+        send_user_hotels(User.get_user(call.message.chat.id).get_user_params_search(), call.message)
     elif re.fullmatch(r"\d+", call.data):
-        user_params_search["destinationId"] = call.data
-        print(user_params_search)
-        if user_params_search.get("sortOrder") == "DISTANCE_FROM_LANDMARK":
+        User.get_user(call.message.chat.id).destination_id = call.data
+        if User.get_sort_order(User.get_user(call.message.chat.id)) == "DISTANCE_FROM_LANDMARK":
             get_range_price(call.message)
+
         else:
             get_count_hotel(call.message)
+
     elif call.data == "cancel":
         easy_travel_bot.send_message(call.message.chat.id, "Жаль, что не удалось помочь.&#128532\n "
                                                            "Вы можете попробовать еще раз!&#127757", parse_mode="html")
@@ -115,7 +121,8 @@ def get_city(message: Any) -> None:
     :rtype: object
     """
     if message.text.replace("-", "").isalpha():
-        user_city = make_location_answer(message.text)
+        User.get_user(message.chat.id).city = message.text
+        user_city = make_location_answer(User.get_city(User.get_user(message.chat.id)))
         if user_city == 'locations_not_found':
             easy_travel_bot.send_message(message.chat.id, "По запросу ничего не найдено.&#128532\n"
                                                           "Возможно вы допустили ошибку в названии?\n "
@@ -131,8 +138,9 @@ def get_city(message: Any) -> None:
         else:
             if len(user_city) > 1:
                 get_callback_city(user_city, message)
+
             else:
-                user_params_search["destinationId"] = user_city[0].get("destinationId")
+                User.get_user(message.chat.id).destination_id = user_city[0].get("destinationId")
                 easy_travel_bot.register_next_step_handler(message, get_count_hotel)
     else:
         easy_travel_bot.send_message(message.chat.id,
@@ -159,8 +167,8 @@ def get_distance(message: Any) -> None:
     if len(message.text.split(sep="-")) == 2 and message.text.split(sep="-")[0].isdigit() and \
             message.text.split(sep="-")[1].isdigit():
         user_range = message.text.split(sep="-")
-        user_params_search["priceMin"] = user_range[0]
-        user_params_search["priceMax"] = user_range[1]
+        User.get_user(message.chat.id).price_min = user_range[0]
+        User.get_user(message.chat.id).price_max = user_range[1]
         if int(user_range[0]) >= 0 and int(user_range[1]) <= 10000:
             easy_travel_bot.send_message(message.chat.id, "На каком расстоянии от центра искать?", parse_mode="html")
             easy_travel_bot.register_next_step_handler(message, check_distance)
@@ -182,8 +190,9 @@ def check_distance(message: Any) -> None:
     :rtype: object
     """
     try:
-        float(message.text)
-
+        number = message.text.replace(",", ".")
+        float(number)
+        User.get_user(message.chat.id).distance_from_centre = number
         get_count_hotel(message)
     except ValueError:
         easy_travel_bot.send_message(message.chat.id, "Расстояние должно быть числом. Введите ещё раз.",
@@ -208,7 +217,7 @@ def get_check_in(message: Any) -> None:
     :rtype: object
     """
     if message.text.isdigit() and 0 < int(message.text) <= 10:
-        user_params_search["pageSize"] = message.text
+        User.get_user(message.chat.id).count_hotel = message.text
         easy_travel_bot.send_message(message.chat.id, "Введите дату <b>заезда</b> в формате YYYY-MM-DD.",
                                      parse_mode="html")
         easy_travel_bot.register_next_step_handler(message, get_check_out)
@@ -227,7 +236,7 @@ def get_check_out(message: Any) -> None:
         """
     if check_date(message.text) is True:
         if datetime.now() <= datetime.strptime(message.text, "%Y-%m-%d"):
-            user_params_search["checkIn"] = message.text
+            User.get_user(message.chat.id).check_in = message.text
             easy_travel_bot.send_message(message.chat.id, "Введите дату <b>отъезда</b> в формате YYYY-MM-DD.",
                                          parse_mode="html")
             easy_travel_bot.register_next_step_handler(message, check_check_out)
@@ -249,9 +258,9 @@ def check_check_out(message: Any) -> None:
         :rtype: object
         """
     if check_date(message.text) is True:
-        if datetime.strptime(user_params_search.get("checkIn"), "%Y-%m-%d") \
+        if datetime.strptime(User.get_check_in(User.get_user(message.chat.id)), "%Y-%m-%d") \
                 < datetime.strptime(message.text, "%Y-%m-%d"):
-            user_params_search["checkOut"] = message.text
+            User.get_user(message.chat.id).check_out = message.text
             get_callback_photo(message)
 
         else:
@@ -274,7 +283,7 @@ def get_callback_photo(message: Any) -> None:
     keyboard.add(types.InlineKeyboardButton(text='Да', callback_data='yes'))
     keyboard.add(types.InlineKeyboardButton(text='Нет', callback_data='no'))
     question = "Выводить фотографии найденных отелей?"
-    easy_travel_bot.send_message(message.from_user.id, text=question, reply_markup=keyboard)
+    easy_travel_bot.send_message(message.chat.id, text=question, reply_markup=keyboard)
 
 
 def get_callback_city(user_city, message: Any) -> None:
@@ -288,7 +297,7 @@ def get_callback_city(user_city, message: Any) -> None:
     keyboard.add(telebot.types.InlineKeyboardButton(text='Выйти. Подходящего города нет.',
                                                     callback_data='cancel'))
     question = "Нашлось несколько вариантов.&#128521 Уточните поиск."
-    easy_travel_bot.send_message(message.from_user.id, text=question, reply_markup=keyboard, parse_mode="html")
+    easy_travel_bot.send_message(message.chat.id, text=question, reply_markup=keyboard, parse_mode="html")
 
 
 def get_count_photo(massage_count_photo: Any) -> None:
@@ -296,14 +305,14 @@ def get_count_photo(massage_count_photo: Any) -> None:
     Получает и проверяет количество фотографий.
     :rtype: object
     """
-    if massage_count_photo.text.isdigit() and int(massage_count_photo.text) <= 10:
-        user_params_search["photo"] = massage_count_photo.text
-        send_user_hotels(user_params_search, massage_count_photo)
+    if massage_count_photo.text.isdigit() and 0 < int(massage_count_photo.text) <= 10:
+        User.get_user(massage_count_photo.chat.id).count_photo = massage_count_photo.text
+        send_user_hotels(User.get_user_params_search(User.get_user(massage_count_photo.chat.id)), massage_count_photo)
     else:
         easy_travel_bot.send_message(massage_count_photo.chat.id, "Количество фотографий должно быть целым числом "
                                                                   "и не более 10. Попробуйте заново.",
                                      parse_mode="html")
-        get_callback_photo(massage_count_photo)
+        get_callback_photo(get_count_photo)
         return
 
 
@@ -313,7 +322,6 @@ def send_user_hotels(user_search: dict, message: Any) -> None:
     :rtype: object
     """
     hotels_list = make_hotel_answer(user_search)
-    print(hotels_list)
     if hotels_list == 'bad_request':
         easy_travel_bot.send_message(message.chat.id, "Не могу получить ответ от сервера.&#128532\n"
                                                       "Попробуйте позже.", parse_mode="html")
@@ -322,6 +330,9 @@ def send_user_hotels(user_search: dict, message: Any) -> None:
                                                       "Попробуйте заново. Выберите другую локацию или даты проживания.",
                                      parse_mode="html")
     else:
+        for_story = f"C {User.get_check_in(User.get_user(message.chat.id))} по " \
+                    f"{User.get_check_in(User.get_user(message.chat.id))}\n" \
+                    f"{User.get_city(User.get_user(message.chat.id))}\n"
         easy_travel_bot.send_message(message.chat.id, "Посмотрим какие отели нашлись:", parse_mode="html")
         for hotel in hotels_list:
             name = hotel.get("name")
@@ -333,15 +344,26 @@ def send_user_hotels(user_search: dict, message: Any) -> None:
             send = f"Название: {name}\nРейтинг: {star_rating}\nАдрес: {address}\n" \
                    f"Расстояние от центра: {distance_from_centre}\n" \
                    f"Цена за одну ночь: {price}\nОбщая стоимость за всё время пребывания: {total_price}"
-            easy_travel_bot.send_message(message.chat.id, send, parse_mode="html")
-            if "photo" in hotel:
+            for_story += send + "\n\n"
+            if "photo" not in hotel:
+                easy_travel_bot.send_message(message.chat.id, send, parse_mode="html")
+            else:
+                media_group = []
                 for item in hotel.get("photo").values():
-                    easy_travel_bot.send_message(message.chat.id, item, parse_mode="html")
+                    photo = dict()
+                    photo["type"] = "photo"
+                    photo["media"] = item
+                    media_group.append(photo)
+                print(media_group)
+                easy_travel_bot.send_media_group(message.chat.id, media_group)
+        date_search = str(datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
+        set_data(User.get_user(message.chat.id).user_id, for_story, date_search,
+                 User.get_user(message.chat.id).user_command)
+    User.del_user(message.chat.id)
 
 
 def check_date(message_date: Any) -> bool:
-    """
-    Проверяет дату на соответствие формату.
+    """    Проверяет дату на соответствие формату.
     :rtype: object
     """
     try:
