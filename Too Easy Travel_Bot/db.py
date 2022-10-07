@@ -34,6 +34,6 @@ def get_history(user_id: int) -> object:
     """
     with sqlite3.connect("user_history.db") as con:
         cur = con.cursor()
-        cur.execute("SELECT date, command, result FROM users_search WHERE user_id = ? ORDER BY date ASC", (user_id,))
-        result = cur.fetchmany(5)
+        cur.execute("SELECT date, command, result FROM  users_search WHERE user_id = ? ORDER BY date DESC LIMIT 5", (user_id,))
+        result = cur.fetchall()
         return result

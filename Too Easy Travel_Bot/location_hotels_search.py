@@ -1,7 +1,6 @@
 import requests
 import json
 import logging
-import nums_from_string
 from typing import Optional, Union
 from datetime import datetime
 
@@ -124,12 +123,11 @@ def make_hotel_answer(message: dict) -> Union[str, list]:
     else:
         answer_hotels = []
         count_photo = message.get("photo")
-        distance = message.get("photo")
         try:
             for item in hotels.get("data").get('body').get('searchResults').get('results'):
-                if distance is not None:
+                if message.get("distance") is not None:
                     hotel_distance = item.get("landmarks")[0].get("distance").split(" ")[0].replace(",", ".")
-                    if float(distance) < float(hotel_distance):
+                    if float(message.get("distance")) < float(hotel_distance):
                         continue
                 answer_dict = dict()
                 answer_dict["name"] = item.get("name")
@@ -141,12 +139,11 @@ def make_hotel_answer(message: dict) -> Union[str, list]:
                 answer_dict["totalPrice"] = str(total_price)+"$"
                 if count_photo is not None:
                     photos = photos_search(item.get("id"))
+                    print(photos)
                     photos_dict = dict()
-                    for photo in range(len(photos.get("hotelImages"))):
+                    for photo in range(int(count_photo)):
                         photos_dict["Url " + str(photo)] = photos.get("hotelImages")[photo].get("baseUrl")\
                             .replace("{size}", "z")
-                        if photo == int(count_photo) - 1:
-                            break
                     answer_dict["photo"] = photos_dict
                 answer_hotels.append(answer_dict)
         except AttributeError as log:

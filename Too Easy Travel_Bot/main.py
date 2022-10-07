@@ -349,12 +349,13 @@ def send_user_hotels(user_search: dict, message: Any) -> None:
                 easy_travel_bot.send_message(message.chat.id, send, parse_mode="html")
             else:
                 media_group = []
+                count = 0
                 for item in hotel.get("photo").values():
-                    photo = dict()
-                    photo["type"] = "photo"
-                    photo["media"] = item
+                    count += 1
+                    photo = types.InputMediaPhoto(item, send, parse_mode="html")
+                    if count > 1:
+                        photo = types.InputMediaPhoto(item)
                     media_group.append(photo)
-                print(media_group)
                 easy_travel_bot.send_media_group(message.chat.id, media_group)
         date_search = str(datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
         set_data(User.get_user(message.chat.id).user_id, for_story, date_search,
