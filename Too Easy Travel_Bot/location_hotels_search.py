@@ -6,7 +6,7 @@ from datetime import datetime
 
 logging.basicConfig(filename="bad_request.log", level=logging.INFO, encoding="utf-8")
 
-X_RAPIDAPI_KEY = "3ca15b43b1mshcac4be044f5df80p1d5eedjsn7e34201ad1dd"
+X_RAPIDAPI_KEY = ?
 
 
 def location_search(user_city: dict) -> Optional[dict]:
